@@ -10,8 +10,17 @@ n.clear()
 
 local Screen = require('screen')
 
+local l = io.open('/tmp/nvim-log.txt', 'a')
+local log = function(...)
+  io.write(ctlseqs.cup:format(24 + 5, 1))
+  io.write(vim.inspect({ ... }) .. '\n')
+  l:write(vim.inspect({ ... }) .. '\n')
+  l:flush()
+end
+
 local stdin = assert(uv.new_tty(0, false))
-local screen = Screen.new(stdin:get_winsize())
+-- local screen = Screen.new(stdin:get_winsize())
+local screen = Screen.new(80, 24)
 vim.print(n.api.nvim_list_uis())
 vim.print(n.api.nvim__redraw({ win = 0, flush = true }))
 -- screen:print_snapshot()
@@ -31,7 +40,7 @@ local grid_clear = function()
   io.write(ctlseqs.sgr_reset)
 end
 
-function screen:_row_expr_no_attr(gridnr, rownr, cursor)
+function screen:_row_repr2(gridnr, rownr)
   local rv = {}
   local i = 1
   local has_windows = self._options.ext_multigrid and gridnr == 1
@@ -56,10 +65,9 @@ function screen:_row_expr_no_attr(gridnr, rownr, cursor)
     end
 
     if not did_window then
-      if not self._busy and cursor and self._cursor.col == i then
-        table.insert(rv, '^')
-      end
+      table.insert(rv, (self._attr_table[row[i].hl_id] or {})[3] or '')
       table.insert(rv, row[i].text)
+      table.insert(rv, ctlseqs.sgr_reset)
       i = i + 1
     end
   end
@@ -67,7 +75,7 @@ function screen:_row_expr_no_attr(gridnr, rownr, cursor)
   return table.concat(rv, '') --:gsub('%s+$', '')
 end
 
-function screen:_render_no_attr()
+function screen:_render()
   local rv = {}
   for igrid, grid in pairs(self._grids) do
     local height = grid.height
@@ -75,12 +83,10 @@ function screen:_render_no_attr()
       height = self._grids[1].height - self.msg_grid_pos
     end
     for i = 1, height do
-      -- local cursor = self._cursor.grid == igrid and self._cursor.row == i
-      local cursor = false
-      table.insert(rv, self:_row_expr_no_attr(igrid, i, cursor) .. '|')
+      table.insert(rv, self:_row_repr2(igrid, i))
     end
   end
-  print(table.concat(rv, '\n'))
+  io.write(table.concat(rv, '\n'))
 end
 
 function screen:_handle_grid_clear(grid)
@@ -89,18 +95,65 @@ function screen:_handle_grid_clear(grid)
 end
 function screen:_handle_flush()
   io.write(ctlseqs.sgr_reset)
-  io.write(ctlseqs.cup:format(self._cursor.row + 1, self._cursor.col + 1))
+  io.write(ctlseqs.cup:format(self._cursor.row, self._cursor.col))
 end
+function screen:_handle_hl_attr_define(id, rgb_attrs, cterm_attrs, info)
+  Screen._handle_hl_attr_define(self, id, rgb_attrs, cterm_attrs, info)
+  -- vim.print(id, rgb_attrs, cterm_attrs, info)
+  local d = {}
+  d[#d + 1] = '\x1b[0m'
+  if rgb_attrs.foreground then
+    d[#d + 1] = ctlseqs.sgr_fg_rgb:format(
+      math.floor(rgb_attrs.foreground / 65536) % 256,
+      math.floor(rgb_attrs.foreground / 256) % 256,
+      rgb_attrs.foreground % 256
+    )
+  end
+  if rgb_attrs.background then
+    d[#d + 1] = ctlseqs.sgr_bg_rgb:format(
+      math.floor(rgb_attrs.background / 65536) % 256,
+      math.floor(rgb_attrs.background / 256) % 256,
+      rgb_attrs.background % 256
+    )
+  end
+  if rgb_attrs.bold then
+    d[#d + 1] = ctlseqs.bold_set
+  end
+  self._attr_table[id][3] = table.concat(d, '')
+  -- vim.print(self._attr_table)
+  -- vim.print(self._hl_info)
+end
+
+local cursor_shape = function(name)
+  local shapes = { block = 1, underline = 3, bar = 5 }
+  io.write(ctlseqs.cursor_shape:format(shapes[name] or 5))
+end
+function screen:_handle_mode_change(mode, idx)
+  assert(mode == self._mode_info[idx + 1].name)
+  self.mode = mode
+  cursor_shape(self._mode_info[idx + 1].cursor_shape)
+end
+function screen:_print_snapshot()
+  -- return Screen._print_snapshot(self)
+  grid_clear()
+  self:_render()
+  -- io.write(ctlseqs.cup:format(self._cursor.row , self._cursor.col ))
+  io.flush()
+end
+
 function screen:_handle_grid_line(grid, row, col, items, wrap)
   Screen._handle_grid_line(self, grid, row, col, items, wrap)
-  self:_render_no_attr()
+  io.write(ctlseqs.cup:format(self._cursor.row, self._cursor.col))
+  grid_clear()
+  self:_render()
 end
-function screen:_handle_grid_scroll(grid, row, col, items, wrap)
-  Screen._handle_grid_scroll(self, grid, row, col, items, wrap)
+
+function screen:_handle_grid_scroll(g, top, bot, left, right, rows, cols)
+  Screen._handle_grid_scroll(self, g, top, bot, left, right, rows, cols)
 end
 
 uv.tty_set_mode(stdin, uv.constants.TTY_MODE_RAW)
-stdin:read_start(function(err, data)
+stdin:read_start(vim.schedule_wrap(function(err, data)
   assert(not err, err)
   if not data then
     return
@@ -108,34 +161,25 @@ stdin:read_start(function(err, data)
   if n.get_session().closed then
     vim.cmd.qall()
   end
-  -- print('KEY:', data)
-  -- n.api.nvim_input(data)
-  -- io.write(ctlseqs.cup:format(10, 10))
-  if redraw_debug then
-    grid_clear()
+  if data == '\127' then
+    data = vim.keycode('<c-h>')
   end
+  log('KEY:', data)
   if not n.get_session()._is_running then
     n.feed(data)
     if redraw_debug then
+      grid_clear()
       screen:redraw_debug()
     end
-    -- screen:sleep(0)
   end
-  -- n.api.nvim__redraw({ win = 0, flush = true })
-  -- screen:sleep(10)
-  -- screen:print_snapshot()
-  -- vim.print(n.api.nvim_buf_get_lines(0, 0, -1, true))
-end)
+end))
 
 assert(uv.new_timer()):start(100, 10, function()
   if not n.get_session()._is_running then
-    -- screen:redraw_debug()
-    -- screen:_redraw()
     screen:sleep(0)
   end
 end)
 
 while true do
-  -- print()
   vim.wait(0)
 end

@@ -32,25 +32,28 @@ M.nvim_set = (
 )
 M.nvim_argv = {
   M.nvim_prog,
-  '-u',
-  'NONE',
+  '--clean',
+  -- '-u',
+  -- 'NONE',
   '-i',
   'NONE',
+  '--cmd',
+  'set guicursor=n-v-ve-c-sm:block,i-c-ci-t:ver25,r-cr-o:hor20',
   -- XXX: find treesitter parsers.
-  '--cmd',
-  M.runtime_set,
-  '--cmd',
-  M.nvim_set,
+  -- '--cmd',
+  -- M.runtime_set,
+  -- '--cmd',
+  -- M.nvim_set,
   -- Remove default user commands and mappings.
-  '--cmd',
-  'comclear | mapclear | mapclear!',
+  -- '--cmd',
+  -- 'comclear | mapclear | mapclear!',
   -- Make screentest work after changing to the new default color scheme
   -- Source 'vim' color scheme without side effects
   -- TODO: rewrite tests
-  '--cmd',
-  'lua dofile("runtime/colors/vim.lua")',
-  '--cmd',
-  'unlet g:colors_name',
+  -- '--cmd',
+  -- 'lua dofile("runtime/colors/vim.lua")',
+  -- '--cmd',
+  -- 'unlet g:colors_name',
   '--embed',
 }
 if os.getenv('OSV_PORT') then

@@ -73,6 +73,8 @@ return {
 
   -- SGR reset all
   sgr_reset = '\x1b[m',
+  sgr_fg_rgb = '\x1b[38:2:%d:%d:%dm',
+  sgr_bg_rgb = '\x1b[48:2:%d:%d:%dm',
 
   -- Colors
   fg_base = '\x1b[3%dm',
