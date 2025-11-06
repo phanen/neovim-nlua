@@ -22,7 +22,7 @@ local M = {}
 M.runtime_set = 'set runtimepath^=' .. ''
 
 -- M.nvim_prog = (os.getenv('NVIM_PRG') or t.paths.test_build_dir .. '/bin/nvim')
-M.nvim_prog = (os.getenv('NVIM_PRG') or os.getenv('VIMRUNTIME'))
+M.nvim_prog = (os.getenv('NVIM_PRG') or vim.v.progpath)
 -- Default settings for the test session.
 M.nvim_set = (
   'set shortmess+=IS background=light noswapfile noautoindent startofline'
@@ -525,22 +525,22 @@ function M.new_session(keep, ...)
   return new_session
 end
 
-busted.subscribe({ 'suite', 'end' }, function()
-  M.check_close(true)
-  local timed_out = false
-  local timer = assert(vim.uv.new_timer())
-  timer:start(10000, 0, function()
-    timed_out = true
-  end)
-  while n_processes > 0 and not timed_out do
-    uv.run('once')
-  end
-  timer:close()
-  if timed_out then
-    print(('warning: %d dangling Nvim processes'):format(n_processes))
-    io.stdout:flush()
-  end
-end)
+-- busted.subscribe({ 'suite', 'end' }, function()
+--   M.check_close(true)
+--   local timed_out = false
+--   local timer = assert(vim.uv.new_timer())
+--   timer:start(10000, 0, function()
+--     timed_out = true
+--   end)
+--   while n_processes > 0 and not timed_out do
+--     uv.run('once')
+--   end
+--   timer:close()
+--   if timed_out then
+--     print(('warning: %d dangling Nvim processes'):format(n_processes))
+--     io.stdout:flush()
+--   end
+-- end)
 
 --- Starts a (non-RPC, `--headless --listen "Tx"`) Nvim process, waits for exit, and returns result.
 ---
@@ -976,12 +976,12 @@ function M.missing_provider(provider)
 end
 
 local load_factor = 1
-if t.is_ci() then
-  -- Compute load factor only once (but outside of any tests).
-  M.clear()
-  M.request('nvim_command', 'source test/old/testdir/load.vim')
-  load_factor = M.request('nvim_eval', 'g:test_load_factor')
-end
+-- if t.is_ci() then
+--   -- Compute load factor only once (but outside of any tests).
+--   M.clear()
+--   M.request('nvim_command', 'source test/old/testdir/load.vim')
+--   load_factor = M.request('nvim_eval', 'g:test_load_factor')
+-- end
 
 --- @param num number
 --- @return number

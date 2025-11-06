@@ -54,7 +54,7 @@ local deepcopy = vim.deepcopy
 local shallowcopy = t.shallowcopy
 local concat_tables = t.concat_tables
 local pesc = vim.pesc
-local run_session = t.run_session
+local run_session = n.run_session
 local eq = t.eq
 local dedent = t.dedent
 local get_session = n.get_session
@@ -111,6 +111,7 @@ local function _init_colors()
   if not status then
     error('failed to get color map')
   end
+  -- vim.print(rv)
   local colors = rv --- @type table<string,integer>
   local colornames = {} --- @type table<integer,string>
   for name, rgb in pairs(colors) do
@@ -1016,7 +1017,9 @@ function Screen:_handle_msg_set_pos(grid, row, scrolled, char, zindex, compindex
   self.msg_compindex = compindex
 end
 
-function Screen:_handle_flush() end
+function Screen:_handle_flush()
+  -- print('eeeeeeeeeeeeeeeeeee')
+end
 
 function Screen:_reset()
   -- TODO: generalize to multigrid later
@@ -1659,7 +1662,7 @@ function Screen:redraw_debug(timeout)
     return true
   end
   if timeout == nil then
-    timeout = 250
+    timeout = 20
   end
   run_session(self._session, nil, notification_cb, nil, timeout)
 end
