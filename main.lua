@@ -8,26 +8,22 @@ n.clear({
   args = args,
   merge = false,
 })
--- vim.print(n.api.nvim_get_api_info())
--- local s = n.get_session()
--- vim.print(s:request('nvim_get_api_info'))
--- vim.print(n.api.nvim_get_color_map())
 
 local Screen = require('screen')
 
 local l = io.open('/tmp/nvim-log.txt', 'a')
 local log = function(...)
-  io.write(ctlseqs.cup:format(24 + 5, 1))
-  io.write(vim.inspect({ ... }) .. '\n')
+  -- io.write(ctlseqs.cup:format(24 + 5, 1))
+  -- io.write(vim.inspect({ ... }) .. '\n')
   l:write(vim.inspect({ ... }) .. '\n')
   l:flush()
 end
 
 local stdin = assert(uv.new_tty(0, false))
--- local screen = Screen.new(stdin:get_winsize())
-local screen = Screen.new(80, 24)
-vim.print(n.api.nvim_list_uis())
-vim.print(n.api.nvim__redraw({ win = 0, flush = true }))
+local screen = Screen.new(stdin:get_winsize())
+-- local screen = Screen.new(80, 24)
+-- vim.print(n.api.nvim_list_uis())
+-- vim.print(n.api.nvim__redraw({ win = 0, flush = true }))
 -- screen:print_snapshot()
 -- vim.print(s:next_message())
 -- require('nvim').api
