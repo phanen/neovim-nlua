@@ -103,19 +103,16 @@ function screen:_handle_hl_attr_define(id, rgb_attrs, cterm_attrs, info)
   -- vim.print(id, rgb_attrs, cterm_attrs, info)
   local d = {}
   d[#d + 1] = '\x1b[0m'
+  local function parse_rgb(rgb)
+    return math.floor(rgb / 65536) % 256, math.floor(rgb / 256) % 256, rgb % 256
+  end
   if rgb_attrs.foreground then
-    d[#d + 1] = ctlseqs.sgr_fg_rgb:format(
-      math.floor(rgb_attrs.foreground / 65536) % 256,
-      math.floor(rgb_attrs.foreground / 256) % 256,
-      rgb_attrs.foreground % 256
-    )
+    local r, g, b = parse_rgb(rgb_attrs.foreground)
+    d[#d + 1] = ctlseqs.sgr_fg_rgb:format(r, g, b)
   end
   if rgb_attrs.background then
-    d[#d + 1] = ctlseqs.sgr_bg_rgb:format(
-      math.floor(rgb_attrs.background / 65536) % 256,
-      math.floor(rgb_attrs.background / 256) % 256,
-      rgb_attrs.background % 256
-    )
+    local r, g, b = parse_rgb(rgb_attrs.background)
+    d[#d + 1] = ctlseqs.sgr_bg_rgb:format(r, g, b)
   end
   if rgb_attrs.bold then
     d[#d + 1] = ctlseqs.bold_set
