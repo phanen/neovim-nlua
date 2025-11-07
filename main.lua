@@ -159,7 +159,7 @@ stdin:read_start(vim.schedule_wrap(function(err, data)
   if not data then
     return
   end
-  if n.get_session().closed then
+  if n.get_session().closed or n.get_session().eof_err then
     vim.cmd.qall()
   end
   if data == '\127' then
@@ -176,6 +176,9 @@ stdin:read_start(vim.schedule_wrap(function(err, data)
 end))
 
 assert(uv.new_timer()):start(100, 10, function()
+  if n.get_session().closed or n.get_session().eof_err then
+    vim.schedule_wrap(vim.cmd.qall)()
+  end
   if not n.get_session()._is_running then
     screen:sleep(0)
   end
