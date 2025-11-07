@@ -71,6 +71,13 @@ function screen:_handle_grid_clear(grid)
   render.clear()
 end
 
+vim.api.nvim_create_autocmd('Signal', {
+  pattern = 'SIGWINCH',
+  callback = function()
+    screen:try_resize(stdin:get_winsize())
+  end,
+})
+
 function screen:_handle_flush()
   io.write(ctlseqs.sgr_reset)
   render.cup(self._cursor.row, self._cursor.col)
