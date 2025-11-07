@@ -2,7 +2,12 @@ local n = require('nvim')()
 local ctlseqs = require('ctlseqs')
 local uv = vim.uv
 
-n.clear()
+local args = vim.deepcopy(_G.arg)
+table.insert(args, 1, '--embed')
+n.clear({
+  args = args,
+  merge = false,
+})
 -- vim.print(n.api.nvim_get_api_info())
 -- local s = n.get_session()
 -- vim.print(s:request('nvim_get_api_info'))
