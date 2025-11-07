@@ -151,6 +151,7 @@ function screen:_handle_grid_scroll(g, top, bot, left, right, rows, cols)
 end
 
 uv.tty_set_mode(stdin, uv.constants.TTY_MODE_RAW)
+io.write(ctlseqs.smcup)
 stdin:read_start(vim.schedule_wrap(function(err, data)
   assert(not err, err)
   if not data then
@@ -175,6 +176,7 @@ end))
 assert(uv.new_timer()):start(100, 10, function()
   if n.get_session().closed or n.get_session().eof_err then
     vim.schedule_wrap(vim.cmd.qall)()
+    io.write(ctlseqs.rmcup)
   end
   if not n.get_session()._is_running then
     screen:sleep(0)
