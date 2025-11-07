@@ -1647,14 +1647,14 @@ function Screen:snapshot_util(request_cb)
   self:print_snapshot()
 end
 
-function Screen:redraw_debug(timeout)
+function Screen:redraw_debug(timeout, log)
   self:print_snapshot()
   local function notification_cb(method, args)
     assert(method == 'redraw')
     for _, update in ipairs(args) do
       -- mode_info_set is quite verbose, comment out the condition to debug it.
       if update[1] ~= 'mode_info_set' then
-        print(inspect(update))
+        log(inspect(update))
       end
     end
     self:_redraw(args)

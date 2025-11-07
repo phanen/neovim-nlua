@@ -1,6 +1,9 @@
+---@diagnostic disable: need-check-nil, param-type-mismatch, duplicate-set-field, unused
 local n = require('nvim')()
 local ctlseqs = require('ctlseqs')
 local uv = vim.uv
+
+local dbg = false
 
 local args = vim.deepcopy(_G.arg)
 table.insert(args, 1, '--embed')
@@ -8,95 +11,69 @@ n.clear({
   args = args,
   merge = false,
 })
+local s = n.get_session()
+
+local render = {
+  hl_id = nil,
+  clear = function()
+    io.write(ctlseqs.home)
+    io.write(ctlseqs.sgr_reset)
+    io.write(ctlseqs.erase_below_cursor)
+  end,
+  cup = function(row, col)
+    io.write(ctlseqs.cup:format(row, col))
+  end,
+  cursor_shape = function(name)
+    local shapes = { block = 1, underline = 3, bar = 5 }
+    io.write(ctlseqs.cursor_shape:format(shapes[name] or 5))
+  end,
+}
 
 local Screen = require('screen')
 
-local l = io.open('/tmp/nvim-log.txt', 'a')
 local log = function(...)
-  -- io.write(ctlseqs.cup:format(24 + 5, 1))
-  -- io.write(vim.inspect({ ... }) .. '\n')
-  l:write(vim.inspect({ ... }) .. '\n')
-  l:flush()
+  if not dbg then
+    return
+  end
+  io.stderr:write(vim.inspect({ ... }) .. '\n')
 end
 
 local stdin = assert(uv.new_tty(0, false))
 local screen = Screen.new(stdin:get_winsize())
--- local screen = Screen.new(80, 24)
--- vim.print(n.api.nvim_list_uis())
--- vim.print(n.api.nvim__redraw({ win = 0, flush = true }))
--- screen:print_snapshot()
--- vim.print(s:next_message())
--- require('nvim').api
---
--- vim.fn.stdioopen({
---   on_stdin = function(data)
---     vim.print('got data', data)
---   end,
--- })
-
-local redraw_debug = false
-local grid_clear = function()
-  io.write(ctlseqs.home)
-  io.write(ctlseqs.erase_below_cursor)
-  io.write(ctlseqs.sgr_reset)
-end
 
 function screen:_row_repr2(gridnr, rownr)
   local rv = {}
   local i = 1
-  local has_windows = self._options.ext_multigrid and gridnr == 1
   local row = self._grids[gridnr].rows[rownr]
-  if has_windows and self.msg_grid and self.msg_grid_pos < rownr then
-    return '[' .. self.msg_grid .. ':' .. string.rep('-', #row) .. ']'
-  end
   while i <= #row do
-    local did_window = false
-    if has_windows then
-      for id, pos in pairs(self.win_position) do
-        if
-          i - 1 == pos.startcol
-          and pos.startrow <= rownr - 1
-          and rownr - 1 < pos.startrow + pos.height
-        then
-          table.insert(rv, '[' .. id .. ':' .. string.rep('-', pos.width) .. ']')
-          i = i + pos.width
-          did_window = true
-        end
-      end
-    end
-
-    if not did_window then
-      table.insert(rv, (self._attr_table[row[i].hl_id] or {})[3] or '')
-      table.insert(rv, row[i].text)
-      table.insert(rv, ctlseqs.sgr_reset)
-      i = i + 1
-    end
+    local cell = row[i]
+    table.insert(rv, self._attr_table[cell.hl_id][3] or ctlseqs.sgr_reset)
+    table.insert(rv, cell.text)
+    i = i + 1
   end
-  -- trailing whitespace
-  return table.concat(rv, '') --:gsub('%s+$', '')
+  table.insert(rv, ctlseqs.sgr_reset)
+  return table.concat(rv, '')
 end
 
-function screen:_render()
+function screen:_render(w)
   local rv = {}
   for igrid, grid in pairs(self._grids) do
     local height = grid.height
-    if igrid == self.msg_grid then
-      height = self._grids[1].height - self.msg_grid_pos
-    end
     for i = 1, height do
       table.insert(rv, self:_row_repr2(igrid, i))
     end
   end
-  io.write(table.concat(rv, '\n'))
+  (w or io.write)(table.concat(rv, '\n'))
 end
 
 function screen:_handle_grid_clear(grid)
   Screen._handle_grid_clear(self, grid)
-  grid_clear()
+  render.clear()
 end
+
 function screen:_handle_flush()
   io.write(ctlseqs.sgr_reset)
-  io.write(ctlseqs.cup:format(self._cursor.row, self._cursor.col))
+  render.cup(self._cursor.row, self._cursor.col)
 end
 function screen:_handle_hl_attr_define(id, rgb_attrs, cterm_attrs, info)
   Screen._handle_hl_attr_define(self, id, rgb_attrs, cterm_attrs, info)
@@ -122,28 +99,29 @@ function screen:_handle_hl_attr_define(id, rgb_attrs, cterm_attrs, info)
   -- vim.print(self._hl_info)
 end
 
-local cursor_shape = function(name)
-  local shapes = { block = 1, underline = 3, bar = 5 }
-  io.write(ctlseqs.cursor_shape:format(shapes[name] or 5))
-end
 function screen:_handle_mode_change(mode, idx)
   assert(mode == self._mode_info[idx + 1].name)
   self.mode = mode
-  cursor_shape(self._mode_info[idx + 1].cursor_shape)
+  render.cursor_shape(self._mode_info[idx + 1].cursor_shape)
 end
-function screen:_print_snapshot()
-  -- return Screen._print_snapshot(self)
-  grid_clear()
-  self:_render()
-  -- io.write(ctlseqs.cup:format(self._cursor.row , self._cursor.col ))
-  io.flush()
+
+function screen:print_snapshot()
+  -- return Screen.print_snapshot(self)
+  -- render.clear()
+  -- self:_render()
+  -- io.flush()
+end
+
+function screen:_handle_grid_clear(grid)
+  Screen._handle_grid_clear(self, grid)
+  render.clear()
 end
 
 function screen:_handle_grid_line(grid, row, col, items, wrap)
   Screen._handle_grid_line(self, grid, row, col, items, wrap)
-  io.write(ctlseqs.cup:format(self._cursor.row, self._cursor.col))
-  grid_clear()
-  self:_render()
+  render.cup(row + 1, 0)
+  io.write(self:_row_repr2(grid, row + 1))
+  -- self:_render()
 end
 
 function screen:_handle_grid_scroll(g, top, bot, left, right, rows, cols)
@@ -157,28 +135,30 @@ stdin:read_start(vim.schedule_wrap(function(err, data)
   if not data then
     return
   end
-  if n.get_session().closed or n.get_session().eof_err then
+  if s.closed or s.eof_err then
     vim.cmd.qall()
   end
   if data == '\127' then
     data = vim.keycode('<c-h>')
+  elseif data == '\027;' then
+    data = '<a-;>'
   end
   log('KEY:', data)
-  if not n.get_session()._is_running then
+  if not s._is_running then
     n.feed(data)
-    if redraw_debug then
-      grid_clear()
-      screen:redraw_debug()
+    if dbg then
+      render.clear()
+      screen:redraw_debug(nil, log)
     end
   end
 end))
 
 assert(uv.new_timer()):start(100, 10, function()
-  if n.get_session().closed or n.get_session().eof_err then
+  if s.closed or s.eof_err then
     vim.schedule_wrap(vim.cmd.qall)()
     io.write(ctlseqs.rmcup)
   end
-  if not n.get_session()._is_running then
+  if not s._is_running then
     screen:sleep(0)
   end
 end)
