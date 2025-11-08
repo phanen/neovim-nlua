@@ -161,6 +161,8 @@ stdin:read_start(vim.schedule_wrap(function(err, data)
 end))
 
 assert(uv.new_timer()):start(100, 10, function()
+  uv.stop()
+  uv.run()
   if s.closed or s.eof_err then
     vim.schedule_wrap(vim.cmd.qall)()
     io.write(ctlseqs.rmcup)
