@@ -152,7 +152,7 @@ stdin:read_start(vim.schedule_wrap(function(err, data)
   end
   log('KEY:', data)
   if not s._is_running then
-    n.feed(data)
+    pcall(n.feed, data)
     if dbg then
       render.clear()
       screen:redraw_debug(nil, log)
